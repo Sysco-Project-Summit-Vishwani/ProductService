@@ -11,9 +11,13 @@ import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 import java.nio.file.*;
 import java.util.UUID;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 
 @Service
 public class ProductServiceImpl implements ProductService {
@@ -27,34 +31,23 @@ public class ProductServiceImpl implements ProductService {
     private final String uploadDir = "uploads/";
     @Override
     public List<ProductDTO> getAllProducts() {
-        try {
             logger.info("Fetching all products");
             List<Product> products = productRepository.findAll();
             return products.stream()
                     .map(product -> modelMapper.map(product, ProductDTO.class))
                     .collect(Collectors.toList());
-        } catch (Exception e) {
-            logger.error("Failed to fetch products", e);
-            throw new RuntimeException("Failed to fetch products");
-        }
     }
 
     @Override
     public ProductDTO getProductById(Long id) {
-        try {
             logger.info("Fetching product with ID: {}", id);
             Product product = productRepository.findById(id)
                     .orElseThrow(() -> new ProductNotFoundException(id));
             return modelMapper.map(product, ProductDTO.class);
-        } catch (Exception e) {
-            logger.error("Failed to fetch product with ID: " + id, e);
-            throw new RuntimeException("Failed to fetch product with id: ");
-        }
     }
 
     @Override
     public ProductDTO addProduct(ProductDTO productDTO, MultipartFile imageFile) {
-        try {
             logger.info("Adding a new product");
             Product product = modelMapper.map(productDTO, Product.class);
             if (imageFile != null && !imageFile.isEmpty()) {
@@ -63,15 +56,10 @@ public class ProductServiceImpl implements ProductService {
             }
             Product savedProduct = productRepository.save(product);
             return modelMapper.map(savedProduct, ProductDTO.class);
-        } catch (Exception e) {
-            logger.error("Failed to add product", e);
-            throw new RuntimeException("Failed to add product");
-        }
     }
 
     @Override
     public ProductDTO updateProduct(Long id, ProductDTO productDTO, MultipartFile imageFile) {
-        try {
             logger.info("Updating product with ID: {}", id);
             Product existingProduct = productRepository.findById(id)
                     .orElseThrow(() -> new ProductNotFoundException(id));
@@ -83,40 +71,36 @@ public class ProductServiceImpl implements ProductService {
 
             Product updatedProduct = productRepository.save(existingProduct);
             return modelMapper.map(updatedProduct, ProductDTO.class);
-        } catch (Exception e) {
-            logger.error("Failed to update product with ID: " + id, e);
-            throw new RuntimeException("Failed to update product with id: ");
-        }
     }
-    private String saveImageFile(MultipartFile file) throws Exception {
+    private String saveImageFile(MultipartFile file) {
         try {
-            String fileName = UUID.randomUUID().toString() + "_" + file.getOriginalFilename();
-            Path uploadPath = Paths.get(uploadDir);
-
-            if (!Files.exists(uploadPath)) {
-                Files.createDirectories(uploadPath);
+            String original = StringUtils.cleanPath(
+                    file.getOriginalFilename() == null ? "" : file.getOriginalFilename());
+            String ext = original.contains(".")
+                    ? original.substring(original.lastIndexOf('.')).toLowerCase()
+                    : "";
+            if (!List.of(".jpg", ".jpeg", ".png", ".webp").contains(ext)) {
+                throw new IllegalArgumentException("Unsupported image type");
             }
 
-            Files.copy(file.getInputStream(), uploadPath.resolve(fileName), StandardCopyOption.REPLACE_EXISTING);
+            String fileName = UUID.randomUUID() + ext;   // no user-controlled name
+            Path uploadPath = Paths.get(uploadDir);
+            Files.createDirectories(uploadPath);          // no-op if it exists
 
-            return uploadDir + fileName; // Return the relative path to the file
-        } catch (Exception e) {
-            logger.error("Failed to save image file", e);
-            throw new RuntimeException("Failed to save image file");
+            try (InputStream in = file.getInputStream()) {
+                Files.copy(in, uploadPath.resolve(fileName), StandardCopyOption.REPLACE_EXISTING);
+            }
+            return uploadDir + fileName;
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to save image file", e);
         }
     }
-
     @Override
     public void deleteProduct(Long id) {
-        try {
             logger.info("Deleting product with ID: {}", id);
             if (!productRepository.existsById(id)) {
                 throw new ProductNotFoundException(id);
             }
             productRepository.deleteById(id);
-        } catch (Exception e) {
-            logger.error("Failed to delete product with ID: " + id, e);
-            throw new RuntimeException("Failed to delete product with id: " + id, e);
-        }
     }
 }
