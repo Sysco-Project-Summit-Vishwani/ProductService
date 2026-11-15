@@ -11,7 +11,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 
-@Getter
 @AllArgsConstructor
 @NoArgsConstructor
 @Data
@@ -31,29 +30,6 @@ public class Product {
     private int stock;
 
     private String imageUrl;
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public void setProductName(String productName) {
-        this.name = name;
-    }
-
-    public void setPrice(double price) {
-        this.price = price;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-
-    public void setStock(int availability) {
-        this.stock = stock;
-    }
-
-    public void setImageUrl(String imageUrl) {this.imageUrl=imageUrl;}
 
 }
 
